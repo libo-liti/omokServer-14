@@ -1,12 +1,80 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const { MongoClient } = require('mongodb'); // MongoDB 라이브러리 추가
+const bcrypt = require('bcrypt'); // bcrypt 라이브러리 추가
 
+// express 애플리케이션 생성
 const app = express();
+app.use(express.json());
+
 const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
+
+// MongoDB 연결 URI
+const uri = 'mongodb://localhost:27017'; // 로컬 MongoDB 주소
+const client = new MongoClient(uri);
+
+// 데이터베이스와 컬렉션 이름 설정
+const dbName = 'omokgame';
+const usersCollectionName = 'users';
+
+// MongoDB 연결 함수
+async function connectToMongo() {
+    try {
+        await client.connect();
+        console.log('MongoDB에 성공적으로 연결되었습니다.');
+    } catch (err) {
+        console.error('MongoDB 연결 오류:', err);
+    }
+}
+
+// 서버 시작 시 MongoDB 연결
+connectToMongo();
+
+// 회원가입 API 엔드포인트
+app.post('/api/signup', async (req, res) => {
+    const { username, password, nickname } = req.body; // 닉네임 추가
+    const db = client.db(dbName);
+    const users = db.collection(usersCollectionName);
+
+    // 아이디 중복 확인
+    const existingUser = await users.findOne({ username });
+    if (existingUser) {
+        return res.status(409).json({ success: false, message: '이미 존재하는 아이디입니다.' });
+    }
+
+    // 비밀번호를 해시(암호화)
+    const saltRounds = 10; // 해시 강도 설정
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // 새 사용자 정보 저장 (닉네임, 암호화된 비밀번호 포함)
+    await users.insertOne({ username, password: hashedPassword, nickname });
+    res.status(201).json({ success: true, message: '회원가입이 완료되었습니다.' });
+});
+
+// 로그인 API 엔드포인트
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    const db = client.db(dbName);
+    const users = db.collection(usersCollectionName);
+
+    const user = await users.findOne({ username });
+    if (!user) {
+        return res.status(401).json({ success: false, message: '아이디가 존재하지 않습니다.' });
+    }
+
+    // 입력된 비밀번호와 저장된 해시 비밀번호를 비교
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+        return res.status(401).json({ success: false, message: '비밀번호가 일치하지 않습니다.' });
+    }
+
+    res.status(200).json({ success: true, message: '로그인 성공!' });
+});
+
 
 // 대기 중인 플레이어 목록
 const waitingPlayers = [];
