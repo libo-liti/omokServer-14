@@ -36,7 +36,7 @@ connectToMongo();
 
 // 회원가입 API 엔드포인트
 app.post('/api/signup', async (req, res) => {
-    const { username, password, nickname } = req.body; // 닉네임 추가
+    const { username, password, nickname } = req.body;
     const db = client.db(dbName);
     const users = db.collection(usersCollectionName);
 
@@ -63,13 +63,13 @@ app.post('/api/login', async (req, res) => {
 
     const user = await users.findOne({ username });
     if (!user) {
-        return res.status(401).json({ success: false, message: '아이디가 존재하지 않습니다.' });
+        return res.status(401).json({ success: false, message: '아이디가 존재하지 않습니다.', result: "id" });
     }
 
     // 입력된 비밀번호와 저장된 해시 비밀번호를 비교
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        return res.status(401).json({ success: false, message: '비밀번호가 일치하지 않습니다.' });
+        return res.status(401).json({ success: false, message: '비밀번호가 일치하지 않습니다.', result: "password" });
     }
 
     res.status(200).json({ success: true, message: '로그인 성공!' });
@@ -94,7 +94,7 @@ io.on('connection', (socket) => {
         // 두 번째 플레이어를 방에 조인
         player2.join(roomName);
 
-        socket.emit('second', { room: roomName });
+        socket.emit('joinRoom', { room: roomName });
 
         // 두 플레이어에게 게임 시작 메시지 전송
         io.to(roomName).emit('gameStart', {
@@ -115,17 +115,17 @@ io.on('connection', (socket) => {
 
         // 대기 목록에 추가
         waitingPlayers.push(socket);
-        socket.emit('waitingForPlayer', { room: roomName });
+        socket.emit('createRoom', { room: roomName });
         console.log(`[방 생성 및 대기] 유저 ${socket.id}가 방 ${roomName}을 만들고 다른 플레이어를 기다립니다.`);
     }
 
     // 2. 클라이언트가 'placeStone' 이벤트를 보낼 때
-    socket.on('placeStone', (data) => {
+    socket.on('doPlayer', (data) => {
         const { room, x, y } = data; // 방 이름, x, y 좌표 받기
         console.log(`방 ${room}에서 플레이어 ${socket.id}가 (${x}, ${y})에 돌을 놓았습니다.`);
 
         // 해당 방의 모든 클라이언트에게 돌이 놓인 위치를 브로드캐스트
-        io.to(room).emit('stonePlaced', {
+        io.to(room).emit('doOpponent', {
             x,
             y,
             player: socket.id
