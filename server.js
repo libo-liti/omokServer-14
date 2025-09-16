@@ -14,7 +14,8 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 // MongoDB 연결 URI
-const uri = 'mongodb://localhost:27017'; // 로컬 MongoDB 주소
+// const uri = 'mongodb://localhost:27017'; // 로컬 MongoDB 주소
+const uri = 'mongodb+srv://jong:omok14@cluster0.fkvfgft.mongodb.net/'; // MongoDB 주소
 const client = new MongoClient(uri);
 
 // 데이터베이스와 컬렉션 이름 설정
