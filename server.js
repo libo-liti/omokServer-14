@@ -134,10 +134,17 @@ io.on('connection', (socket) => {
         });
     });
 
+    // 이모티콘 보내기
     socket.on('playerEmoji', (data) => {
         const { room, emoji } = data;
         // io.to(room).emit('opponentEmoji', { emoji: emoji });
         socket.broadcast.to(room).emit('opponentEmoji', { emoji: emoji });
+    });
+
+    // 기권
+    socket.on('surrender', (data) => {
+        const { room } = data;
+        socket.broadcast.to(room).emit('escapeOpponent');
     });
 
     // 3. 클라이언트와 연결이 끊어지면 실행될 이벤트
