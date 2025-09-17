@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { MongoClient } = require('mongodb'); // MongoDB 라이브러리 추가
 const bcrypt = require('bcrypt'); // bcrypt 라이브러리 추가
+const { log } = require('console');
 
 // express 애플리케이션 생성
 const app = express();
@@ -131,6 +132,12 @@ io.on('connection', (socket) => {
             y,
             player: socket.id
         });
+    });
+
+    socket.on('playerEmoji', (data) => {
+        const { room, emoji } = data;
+        // io.to(room).emit('opponentEmoji', { emoji: emoji });
+        socket.broadcast.to(room).emit('opponentEmoji', { emoji: emoji });
     });
 
     // 3. 클라이언트와 연결이 끊어지면 실행될 이벤트
