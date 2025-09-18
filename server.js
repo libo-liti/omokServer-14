@@ -45,7 +45,7 @@ app.post('/api/signup', async (req, res) => {
     // 아이디 중복 확인
     const existingUser = await users.findOne({ username });
     if (existingUser) {
-        return res.status(409).json({ success: false, message: '이미 존재하는 아이디입니다.' });
+        return res.status(409).json({ success: false, message: '이미 존재하는 아이디입니다.', result: "id" });
     }
 
     // 비밀번호를 해시(암호화)
