@@ -41,15 +41,12 @@ app.post('/api/check-username', async (req, res) => {
     const { username } = req.body;
     const db = client.db(dbName);
     const users = db.collection(usersCollectionName);
-    console.log(username);
     const existingUser = await users.findOne({ username });
 
     if (existingUser) {
         // 아이디가 이미 존재함
-        console.log('이미 존재');
         return res.status(409).json({ success: false, message: '이미 존재하는 아이디입니다.' });
     } else {
-        console.log('가능');
         // 아이디 사용 가능
         return res.status(200).json({ success: true, message: '사용 가능한 아이디입니다.' });
     }
