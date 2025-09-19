@@ -168,6 +168,12 @@ io.on('connection', (socket) => {
         socket.broadcast.to(room).emit('escapeOpponent');
     });
 
+    // 아케이드 득점
+    socket.on('arcadeSuccess', (data) => {
+        const { room, player } = data;
+        socket.broadcast.to(room).emit('arcadeOpponent', { player: player });
+    });
+
     // 3. 클라이언트와 연결이 끊어지면 실행될 이벤트
     socket.on('disconnect', () => {
         console.log('유저 연결이 끊어졌습니다:', socket.nickname);
