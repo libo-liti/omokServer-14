@@ -143,7 +143,7 @@ io.on('connection', (socket) => {
 
         io.to(roomName).emit('gameStart', {
             room: roomName,
-            player1: player1.nickname,
+            player1: player1.creator.nickname,
             player2: player2.nickname
         });
 
