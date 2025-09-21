@@ -95,7 +95,7 @@ app.post('/api/login', async (req, res) => {
 
 
 // 대기 중인 플레이어 목록
-const waitingPlayers = [];
+const waitingRooms = {};
 
 io.on('connection', (socket) => {
     console.log('새로운 유저가 접속했습니다:', socket.id);
@@ -103,44 +103,74 @@ io.on('connection', (socket) => {
     socket.on('registerNickname', (data) => {
         const { nickname } = data;
         socket.nickname = nickname;
-
-        // 1. 대기 중인 플레이어가 있는지 확인
-        if (waitingPlayers.length > 0) {
-            // 대기 중인 플레이어가 있다면, 이미 생성된 방에 두 번째 플레이어 조인
-            const player1 = waitingPlayers.pop();
-            const player2 = socket;
-
-            // player1이 이미 생성해둔 방 이름 가져오기
-            const roomName = player1.roomName; // 'roomName' 속성을 사용하여 방 이름 가져오기
-
-            // 두 번째 플레이어를 방에 조인
-            player2.join(roomName);
-
-            socket.emit('joinRoom', { room: roomName });
-
-            // 두 플레이어에게 게임 시작 메시지 전송
-            io.to(roomName).emit('gameStart', {
-                room: roomName,
-                player1: player1.nickname,
-                player2: player2.nickname
-            });
-
-            console.log(`[게임 시작] 방: ${roomName}, 플레이어: ${player1.nickname}, ${player2.nickname}`);
-
-        } else {
-            // 대기 중인 플레이어가 없다면, 첫 번째 플레이어가 방을 만들고 대기
-            const roomName = `room-${socket.nickname}`;
-            socket.join(roomName); // 플레이어를 방에 조인시킴
-
-            // 방 이름 정보를 소켓에 저장
-            socket.roomName = roomName;
-
-            // 대기 목록에 추가
-            waitingPlayers.push(socket);
-            socket.emit('createRoom', { room: roomName });
-            console.log(`[방 생성 및 대기] 유저 ${socket.nickname}가 방 ${roomName}을 만들고 다른 플레이어를 기다립니다.`);
-        }
     })
+
+    socket.on('getRooms', () => {
+        // 현재 대기 중인 방들의 목록을 배열로 만들어서 전송
+        const roomsList = Object.keys(waitingRooms).map(roomName => ({
+            roomName: roomName,
+            mode: waitingRooms[roomName].mode
+        }));
+        socket.emit('roomsList', { rooms: roomsList });
+        console.log(`[방 목록 제공] 유저에게 방 목록을 전송했습니다.`);
+    });
+
+    socket.on('joinRoomCheck', (data) => {
+        const { roomName, mode } = data;
+        // 해당 방이 존재하는지, 그리고 플레이어가 조인할 수 있는지 확인
+        if (waitingRooms[roomName]) {
+            socket.emit('joinRoomSuccess', { roomName, mode });
+        } else {
+            // 방이 존재하지 않거나, 이미 게임이 시작된 경우
+            socket.emit('joinRoomFailed');
+        }
+    });
+
+    socket.on('joinRoom', (data) => {
+        const { roomName } = data;
+
+        const player1 = waitingRooms[roomName];
+        const player2 = socket;
+
+        // 두 번째 플레이어를 방에 조인
+        player2.join(roomName);
+        socket.emit('joinRoom', { room: roomName });
+
+        delete player1.createdRoomName;
+
+        // waitingRooms에서 해당 방 제거 (게임 시작했으므로)
+        delete waitingRooms[roomName];
+
+        io.to(roomName).emit('gameStart', {
+            room: roomName,
+            player1: player1.nickname,
+            player2: player2.nickname
+        });
+
+        console.log(`[게임 시작] 방: ${roomName}, 플레이어: ${player1.nickname}, ${player2.nickname}`);
+    });
+
+    socket.on('createRoomCheck', (data) => {
+        const { roomName, mode } = data;
+        if (waitingRooms[roomName])
+            socket.emit('createRoomFailed')
+        else
+            socket.emit('createRoomSuccess', { roomName, mode })
+    });
+
+    // 3. 클라이언트가 새로운 방을 만들 때
+    socket.on('createRoom', (data) => {
+        const { roomName, mode } = data;
+        const roomInfo = {
+            creator: socket,
+            mode: mode
+        };
+        waitingRooms[roomName] = roomInfo;
+        socket.join(roomName);
+        socket.createdRoomName = roomName;
+        socket.emit('createRoom', { room: roomName });
+        console.log(`방 생성`);
+    });
 
     // 2. 클라이언트가 'placeStone' 이벤트를 보낼 때
     socket.on('doPlayer', (data) => {
@@ -176,12 +206,15 @@ io.on('connection', (socket) => {
 
     // 3. 클라이언트와 연결이 끊어지면 실행될 이벤트
     socket.on('disconnect', () => {
-        console.log('유저 연결이 끊어졌습니다:', socket.nickname);
+        console.log('유저 연결이 끊어졌습니다:');
 
-        // 만약 대기 중인 플레이어였다면, 목록에서 제거
-        const index = waitingPlayers.indexOf(socket);
-        if (index !== -1) {
-            waitingPlayers.splice(index, 1);
+        const createdRoomName = socket.createdRoomName;
+        if (createdRoomName) {
+            // 해당 방이 waitingRooms 객체에 존재하는지 확인
+            if (waitingRooms[createdRoomName]) {
+                // 방 삭제
+                delete waitingRooms[createdRoomName];
+            }
         }
     });
 });
